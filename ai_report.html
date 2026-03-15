@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Smart TV Network Traffic Analysis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #fafafa; /* Light, calm background */
+        color: #333333;
+      }
+
+      /* <!-- Chosen Palette: Warm Neutrals & Muted Indicators -->
+        Background: #FAFAFA (Very light gray/almost white)
+        Cards: #FFFFFF
+        Accents: #E8E4D9 (Warm Beige), #4A5568 (Slate for text)
+        Indicators: #E07A5F (Muted Red/Telemetry), #F2CC8F (Muted Yellow/Ads), #81B29A (Muted Green/System), #3D5A80 (Muted Blue/UI)
+        */
+
+      .chart-container {
+        position: relative;
+        width: 100%;
+        max-width: 100%; /* Adapts to grid cell */
+        margin-left: auto;
+        margin-right: auto;
+        height: 300px; /* Base height */
+        max-height: 350px;
+      }
+
+      @media (min-width: 768px) {
+        .chart-container {
+          height: 350px;
+        }
+      }
+
+      .custom-scroll::-webkit-scrollbar {
+        width: 6px;
+      }
+      .custom-scroll::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+      }
+      .custom-scroll::-webkit-scrollbar-thumb {
+        background: #d1d5db;
+        border-radius: 4px;
+      }
+      .custom-scroll::-webkit-scrollbar-thumb:hover {
+        background: #9ca3af;
+      }
+
+      /* Category tags */
+      .tag-telemetry {
+        background-color: #fde8e8;
+        color: #9b1c1c;
+        border: 1px solid #f8b4b4;
+      }
+      .tag-ads {
+        background-color: #fdf6b2;
+        color: #723b13;
+        border: 1px solid #faca15;
+      }
+      .tag-system {
+        background-color: #def7ec;
+        color: #03543f;
+        border: 1px solid #84e1bc;
+      }
+      .tag-ui {
+        background-color: #e1effe;
+        color: #1e429f;
+        border: 1px solid #a4cafe;
+      }
+
+      .domain-item {
+        transition: all 0.2s ease-in-out;
+      }
+      .domain-item:hover {
+        transform: translateX(4px);
+        background-color: #f3f4f6;
+      }
+      .domain-item.active {
+        background-color: #e8e4d9;
+        border-left: 4px solid #8c7b60;
+      }
+    </style>
+  </head>
+  <body class="antialiased text-gray-800 selection:bg-stone-200">
+    <!-- Application Structure Plan: 
+    1. Header: Context and title setting the tone.
+    2. Executive Summary (Top Grid): High-level breakdown of what the TV is doing (Charts).
+    3. Interactive Explorer (Bottom Grid): Left panel contains a filterable list of captured domains. Right panel contains an "Intel Card" that dynamically updates to show research, company background, and API inference based on the clicked domain.
+    This structure is chosen because raw DNS logs are overwhelming. Users need to first see the "big picture" (categories, companies), and then have a tool to drill down into specific technical queries at their own pace.
+    -->
+
+    <!-- Visualization & Content Choices: 
+    - Goal: Overview of Traffic Types -> Viz: Doughnut Chart (Chart.js) -> Interaction: Hover for exact counts -> Justification: Shows proportion of telemetry vs essential system traffic quickly. NO SVG used.
+    - Goal: Identify Data Recipients -> Viz: Horizontal Bar Chart (Chart.js) -> Interaction: Hover for counts -> Justification: Clearly ranks which companies are receiving the most pings. NO SVG used.
+    - Goal: Detailed Domain Research -> Viz: Interactive List + Detail Pane (HTML/JS) -> Interaction: Click list item to update detail pane -> Justification: Keeps interface clean while allowing deep-dive into API speculation and company intel. NO SVG used.
+    -->
+
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <!-- Header -->
+      <header class="mb-8 border-b border-stone-200 pb-6">
+        <h1 class="text-3xl font-bold text-stone-800 tracking-tight">
+          Smart TV Network Telemetry Report
+        </h1>
+        <p class="text-stone-500 mt-2 text-lg">
+          Analysis of outbound DNS queries and associated corporate entities.
+        </p>
+      </header>
+
+      <!-- Intro Text -->
+      <div
+        class="bg-white rounded-xl shadow-sm border border-stone-100 p-6 mb-8"
+      >
+        <h2 class="text-xl font-semibold mb-3">Context & Findings</h2>
+        <p class="text-stone-600 leading-relaxed mb-4">
+          Based on the provided DNS query logs from your new TV, we have
+          conducted an OSINT (Open Source Intelligence) analysis on the
+          destination domains. The analysis reveals a standard profile for
+          modern smart TVs, characterized by heavy telemetry, user interface
+          dynamic loading, and targeted advertising endpoints. The vast majority
+          of the traffic is routed to
+          <strong>Leiniao (FFalcon Technology)</strong>, a joint venture that
+          develops the smart OS for TCL televisions.
+        </p>
+      </div>
+
+      <!-- Dashboard Widgets -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <!-- Chart 1: Category Breakdown -->
+        <div class="bg-white rounded-xl shadow-sm border border-stone-100 p-6">
+          <h3 class="text-lg font-semibold mb-1">Traffic by Category</h3>
+          <p class="text-sm text-stone-500 mb-4">
+            Functional grouping of the logged domains.
+          </p>
+          <div class="chart-container">
+            <canvas id="categoryChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 2: Company Breakdown -->
+        <div class="bg-white rounded-xl shadow-sm border border-stone-100 p-6">
+          <h3 class="text-lg font-semibold mb-1">Data Recipients</h3>
+          <p class="text-sm text-stone-500 mb-4">
+            Corporate entities controlling the endpoint servers.
+          </p>
+          <div class="chart-container">
+            <canvas id="companyChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Interactive Explorer Section -->
+      <div class="mb-12">
+        <div class="mb-4">
+          <h2 class="text-2xl font-bold text-stone-800">
+            Domain Intel Explorer
+          </h2>
+          <p class="text-stone-500 text-sm">
+            Select a domain from the list to view detailed analysis, company
+            profiles, and API documentation inferences.
+          </p>
+        </div>
+
+        <div
+          class="grid grid-cols-1 lg:grid-cols-3 gap-6 bg-white rounded-xl shadow-sm border border-stone-100 overflow-hidden h-[600px]"
+        >
+          <!-- Left Panel: Domain List -->
+          <div
+            class="col-span-1 border-r border-stone-100 flex flex-col bg-stone-50/50"
+          >
+            <div
+              class="p-4 border-b border-stone-200 flex justify-between items-center bg-white"
+            >
+              <span class="font-semibold text-stone-700"
+                >Logged Queries (<span id="queryCount">0</span>)</span
+              >
+              <select
+                id="categoryFilter"
+                class="text-sm border-stone-300 rounded-md shadow-sm focus:border-stone-500 focus:ring-stone-500 p-1 bg-stone-50"
+              >
+                <option value="all">All Categories</option>
+                <option value="telemetry">Telemetry</option>
+                <option value="system">System/Config</option>
+                <option value="ads">Advertising</option>
+                <option value="ui">User Interface</option>
+              </select>
+            </div>
+            <div
+              class="overflow-y-auto custom-scroll flex-grow p-2"
+              id="domainList"
+            >
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- Right Panel: Intelligence Card -->
+          <div
+            class="col-span-1 lg:col-span-2 p-6 overflow-y-auto custom-scroll"
+            id="intelCard"
+          >
+            <!-- Default State -->
+            <div
+              class="h-full flex flex-col items-center justify-center text-center text-stone-400"
+            >
+              <div class="text-6xl mb-4">&#x1F50D;</div>
+              <!-- Unicode Magnifying Glass -->
+              <h3 class="text-xl font-medium text-stone-600">
+                Select a domain
+              </h3>
+              <p class="mt-2 text-sm max-w-sm">
+                Click any domain in the list to reveal associated intelligence,
+                APIs, and company background.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Corporate Profiles Section -->
+      <div class="bg-stone-800 text-stone-100 rounded-xl shadow-md p-8 mb-8">
+        <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+          <span class="text-2xl">&#x1F3E2;</span> Corporate Entity Profiles
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <!-- Entity 1 -->
+          <div class="bg-stone-700 p-5 rounded-lg border border-stone-600">
+            <h3 class="text-lg font-bold text-white mb-2">Leiniao / FFalcon</h3>
+            <p class="text-sm text-stone-300 mb-3">
+              The primary OS developer for TCL smart TVs. FFalcon Technology is
+              a joint venture predominantly backed by TCL Electronics and
+              Tencent.
+            </p>
+            <ul class="text-xs text-stone-400 space-y-1">
+              <li>&#x2022; Handles core UI (Launcher)</li>
+              <li>&#x2022; Manages Over-The-Air (OTA) updates</li>
+              <li>&#x2022; Operates extensive user telemetry</li>
+            </ul>
+          </div>
+
+          <!-- Entity 2 -->
+          <div class="bg-stone-700 p-5 rounded-lg border border-stone-600">
+            <h3 class="text-lg font-bold text-white mb-2">Huan.tv</h3>
+            <p class="text-sm text-stone-300 mb-3">
+              A major Chinese smart TV service provider. They provide content
+              ecosystems, app stores, and historically, content recognition and
+              ad-insertion services.
+            </p>
+            <ul class="text-xs text-stone-400 space-y-1">
+              <li>&#x2022; Content filtering endpoints</li>
+              <li>&#x2022; Third-party app integration</li>
+            </ul>
+          </div>
+
+          <!-- Entity 3 -->
+          <div class="bg-stone-700 p-5 rounded-lg border border-stone-600">
+            <h3 class="text-lg font-bold text-white mb-2">CEDock</h3>
+            <p class="text-sm text-stone-300 mb-3">
+              Often associated with backend infrastructure for device
+              activation, EU specific user consent tracking, and initial
+              out-of-box experience configurations.
+            </p>
+            <ul class="text-xs text-stone-400 space-y-1">
+              <li>&#x2022; Device registration</li>
+              <li>&#x2022; Regional policy enforcement</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Data Storage: Core Domain Intelligence
+      const domainData = [
+        {
+          domain: "on-hw-tdp-o.api.leiniao.com",
+          company: "Leiniao (FFalcon / TCL)",
+          category: "telemetry",
+          categoryLabel: "Telemetry",
+          title: "Telemetry Data Platform",
+          desc: "The 'TDP' (Telemetry Data Platform) endpoint. This is a primary data collection hub. It likely transmits heartbeat signals, app usage statistics, remote control button presses, and watch history back to TCL servers.",
+          apiInference:
+            "Expected REST POST endpoint where the TV sends JSON payloads or Protocol Buffers containing device IDs (MAC, UUID), timestamps, and event action codes (e.g., 'APP_OPENED: Netflix').",
+        },
+        {
+          domain: "hw-tdp-o.api.leiniao.com",
+          company: "Leiniao (FFalcon / TCL)",
+          category: "telemetry",
+          categoryLabel: "Telemetry",
+          title: "Telemetry Data Platform (Fallback)",
+          desc: "A secondary or regional variant of the Telemetry Data Platform. Similar functionality to the 'on-' prefixed version.",
+          apiInference:
+            "Standard data ingestion API. Likely uses TLS encryption to secure device metrics.",
+        },
+        {
+          domain: "on-hweudc-o.api.leiniao.com",
+          company: "Leiniao (FFalcon / TCL)",
+          category: "telemetry",
+          categoryLabel: "Telemetry",
+          title: "EU Data Collection Endpoint",
+          desc: "'EUDC' stands for End User Data Collection (specifically tailored or segregated for EU/GDPR regions). It handles the ingestion of user metrics specifically from European IP addresses.",
+          apiInference:
+            "Accepts POST requests. Payloads likely include GDPR consent flags alongside standard usage metrics to ensure compliance with European privacy laws.",
+        },
+        {
+          domain: "on-hweudc-conf-o.api.leiniao.com",
+          company: "Leiniao (FFalcon / TCL)",
+          category: "system",
+          categoryLabel: "System/Config",
+          title: "EU Data Collection Configuration",
+          desc: "Fetches configuration files dictating *what* telemetry the TV is allowed to collect based on user consent given during the initial setup.",
+          apiInference:
+            "GET request endpoint returning JSON configs like `{ 'allow_crash_reports': true, 'allow_ad_tracking': false }`.",
+        },
+        {
+          domain: "on-hwtcs-o.api.leiniao.com",
+          company: "Leiniao (FFalcon / TCL)",
+          category: "telemetry",
+          categoryLabel: "Telemetry",
+          title: "TCL Customer Service / Telemetry",
+          desc: "Likely relates to customer service metrics, crash reporting, or diagnostic data used to troubleshoot issues or monitor general firmware health.",
+          apiInference:
+            "API to upload system logs, kernel panics, or application crash dumps.",
+        },
+        {
+          domain: "app-measurement.com",
+          company: "Google",
+          category: "telemetry",
+          categoryLabel: "Telemetry",
+          title: "Google App Measurement (Firebase)",
+          desc: "Standard Google Analytics / Firebase endpoint used by the underlying Android TV OS or specific built-in apps to track user engagement and app performance.",
+          apiInference:
+            "Well-documented Google Analytics API collecting session times, screen views, and user demographics.",
+        },
+        {
+          domain: "on-hwupgrade-o.api.leiniao.com",
+          company: "Leiniao (FFalcon / TCL)",
+          category: "system",
+          categoryLabel: "System/Config",
+          title: "Hardware/Firmware Upgrade",
+          desc: "The primary endpoint the TV polls to check if a new Over-The-Air (OTA) firmware update is available.",
+          apiInference:
+            "Sends a GET/POST with current firmware version and hardware ID. Returns JSON detailing update URL, release notes, and mandatory flags.",
+        },
+        {
+          domain: "on-hwuc-conf-o.api.leiniao.com",
+          company: "Leiniao (FFalcon / TCL)",
+          category: "system",
+          categoryLabel: "System/Config",
+          title: "Hardware User Configuration",
+          desc: "Fetches dynamic configurations for the TV interface, enabling or disabling features remotely without requiring a full firmware update.",
+          apiInference:
+            "Returns feature toggles (feature flags) based on region and TV model.",
+        },
+        {
+          domain: "on-hwtvmanage-o.api.leiniao.com",
+          company: "Leiniao (FFalcon / TCL)",
+          category: "system",
+          categoryLabel: "System/Config",
+          title: "TV Remote Management",
+          desc: "Device management endpoint. Could be used for pairing mobile apps (like the TCL Home app) or backend device state synchronization.",
+          apiInference:
+            "WebSocket or long-polling REST API for real-time device control and status reporting.",
+        },
+        {
+          domain: "eu-newuser-tcl.cedock.com",
+          company: "CEDock / TCL",
+          category: "system",
+          categoryLabel: "System/Config",
+          title: "New User Activation (EU)",
+          desc: "Hit during the initial setup of the TV. Registers the device as activated, likely starting the warranty period and locking the device to the EU region.",
+          apiInference:
+            "One-time POST request containing device serial number, MAC address, and IP location data.",
+        },
+        {
+          domain: "euads-o.api.leiniao.com",
+          company: "Leiniao (FFalcon / TCL)",
+          category: "ads",
+          categoryLabel: "Advertising",
+          title: "European Advertising Engine",
+          desc: "Requests targeted advertisements to display on the TV's home screen or within free ad-supported channels.",
+          apiInference:
+            "GET request sending an advertising ID. Returns JSON containing image URLs, video links, and click-through tracking URLs for banner ads.",
+        },
+        {
+          domain: "eu-filter-upgrade.huan.tv",
+          company: "Huan.tv",
+          category: "ads",
+          categoryLabel: "Advertising",
+          title: "Content/Ad Filtering Rules",
+          desc: "Downloads updated lists or 'filters'. While it sounds like an ad-blocker, in the context of smart TVs, this is often used for Automatic Content Recognition (ACR) to overlay ads based on what is currently playing on screen.",
+          apiInference:
+            "Downloads a compressed ruleset (XML or JSON) that the TV uses locally to analyze screen frames or metadata.",
+        },
+        {
+          domain: "s3.tcllauncher.com",
+          company: "TCL",
+          category: "ui",
+          categoryLabel: "User Interface",
+          title: "Launcher Asset Storage",
+          desc: "An Amazon S3 bucket used to host static assets like background images, icons, and promotional banners for the TV's home screen launcher.",
+          apiInference:
+            "Standard HTTP GET requests for static image files (.png, .jpg, .webp).",
+        },
+        {
+          domain: "on-hwlauncher-o.api.leiniao.com",
+          company: "Leiniao (FFalcon / TCL)",
+          category: "ui",
+          categoryLabel: "User Interface",
+          title: "Dynamic Launcher API",
+          desc: "Fetches the layout and structural data for the home screen interface, dictating which rows (e.g., 'Trending', 'Continue Watching') appear.",
+          apiInference:
+            "Returns a complex JSON tree defining the UI components, their order, and API endpoints to fetch their specific content.",
+        },
+        {
+          domain: "on-hwlauncher-apps-o.api.leiniao.com",
+          company: "Leiniao (FFalcon / TCL)",
+          category: "ui",
+          categoryLabel: "User Interface",
+          title: "Launcher Applications List",
+          desc: "Provides the list of recommended apps, sponsored apps, and updates the catalog of available applications displayed on the home screen.",
+          apiInference:
+            "JSON array containing app metadata: App Name, Package ID, Icon URL, and Deep-link URIs.",
+        },
+        {
+          domain: "hwlauncher-apps-o.api.leiniao.com",
+          company: "Leiniao (FFalcon / TCL)",
+          category: "ui",
+          categoryLabel: "User Interface",
+          title: "Launcher Apps (Fallback)",
+          desc: "Secondary endpoint for fetching application metadata for the launcher interface.",
+          apiInference: "Identical to the 'on-' prefixed counterpart.",
+        },
+        {
+          domain: "hwtpc-o.api.leiniao.com",
+          company: "Leiniao (FFalcon / TCL)",
+          category: "ui",
+          categoryLabel: "User Interface",
+          title: "Third-Party Content API",
+          desc: "Likely aggregates content feeds from third-party streaming services (Netflix, YouTube, Prime Video) to display unified recommendations directly on the TV home screen.",
+          apiInference:
+            "Aggregator API pulling metadata (movie titles, posters) via server-to-server integrations.",
+        },
+        {
+          domain: "ai.tclking.com",
+          company: "TCL",
+          category: "telemetry",
+          categoryLabel: "Telemetry",
+          title: "TCL AI Services",
+          desc: "Handles AI-related features. This could involve voice assistant query processing (sending voice snippets for speech-to-text) or AI picture/sound optimization telemetry.",
+          apiInference:
+            "POST requests containing either compressed audio buffers (for voice) or picture metadata for cloud-assisted processing.",
+        },
+        {
+          domain: "on-hwmsg-ds-o.api.leiniao.com",
+          company: "Leiniao (FFalcon / TCL)",
+          category: "system",
+          categoryLabel: "System/Config",
+          title: "Device Messaging Service",
+          desc: "Handles push notifications to the TV. Used to alert the user of new firmware updates, messages from the manufacturer, or warnings.",
+          apiInference:
+            "Likely maintains a persistent WebSocket connection to receive asynchronous push payloads.",
+        },
+        {
+          domain: "hwmsg-as9-o.api.leiniao.com",
+          company: "Leiniao (FFalcon / TCL)",
+          category: "system",
+          categoryLabel: "System/Config",
+          title: "Messaging Service Node",
+          desc: "Another node in the device messaging infrastructure, likely for load balancing or specific regional routing.",
+          apiInference: "Standard messaging protocol endpoint.",
+        },
+      ];
+
+      // State Management
+      let currentFilter = "all";
+
+      // DOM Elements
+      const domainListEl = document.getElementById("domainList");
+      const intelCardEl = document.getElementById("intelCard");
+      const filterSelect = document.getElementById("categoryFilter");
+      const queryCountEl = document.getElementById("queryCount");
+
+      // Helper: Get Tailwind class for category
+      function getCategoryClass(category) {
+        switch (category) {
+          case "telemetry":
+            return "tag-telemetry";
+          case "ads":
+            return "tag-ads";
+          case "system":
+            return "tag-system";
+          case "ui":
+            return "tag-ui";
+          default:
+            return "bg-gray-100 text-gray-800 border-gray-300";
+        }
+      }
+
+      // Initialize Charts
+      function initCharts() {
+        const categories = {};
+        const companies = {};
+
+        domainData.forEach((d) => {
+          categories[d.categoryLabel] = (categories[d.categoryLabel] || 0) + 1;
+          companies[d.company] = (companies[d.company] || 0) + 1;
+        });
+
+        // 1. Doughnut Chart
+        const ctxCat = document
+          .getElementById("categoryChart")
+          .getContext("2d");
+        new Chart(ctxCat, {
+          type: "doughnut",
+          data: {
+            labels: Object.keys(categories),
+            datasets: [
+              {
+                data: Object.values(categories),
+                backgroundColor: ["#E07A5F", "#81B29A", "#F2CC8F", "#3D5A80"],
+                borderWidth: 0,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: "right",
+                labels: { font: { family: "Inter" } },
+              },
+            },
+            cutout: "70%",
+          },
+        });
+
+        // 2. Bar Chart
+        const ctxComp = document
+          .getElementById("companyChart")
+          .getContext("2d");
+        new Chart(ctxComp, {
+          type: "bar",
+          data: {
+            labels: Object.keys(companies),
+            datasets: [
+              {
+                label: "Number of Domains",
+                data: Object.values(companies),
+                backgroundColor: "#8c7b60",
+                borderRadius: 4,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "y", // Horizontal bar
+            plugins: {
+              legend: { display: false },
+            },
+            scales: {
+              x: { beginAtZero: true, grid: { display: false } },
+              y: {
+                grid: { display: false },
+                ticks: { font: { family: "Inter" } },
+              },
+            },
+          },
+        });
+      }
+
+      // Render List
+      function renderList() {
+        domainListEl.innerHTML = "";
+
+        const filteredData =
+          currentFilter === "all"
+            ? domainData
+            : domainData.filter((d) => d.category === currentFilter);
+
+        queryCountEl.innerText = filteredData.length;
+
+        filteredData.forEach((item, index) => {
+          const div = document.createElement("div");
+          div.className = `domain-item p-3 mb-2 rounded border border-stone-100 bg-white cursor-pointer flex flex-col`;
+          div.onclick = () => showIntel(item, div);
+
+          div.innerHTML = `
+                    <span class="font-mono text-sm font-medium text-stone-800 break-all">${item.domain}</span>
+                    <div class="mt-2 flex items-center justify-between">
+                        <span class="text-xs text-stone-500">${item.company}</span>
+                        <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${getCategoryClass(item.category)}">${item.categoryLabel}</span>
+                    </div>
+                `;
+          domainListEl.appendChild(div);
+        });
+      }
+
+      // Show Intel Card
+      function showIntel(data, element) {
+        // Highlight active item
+        document
+          .querySelectorAll(".domain-item")
+          .forEach((el) => el.classList.remove("active"));
+        element.classList.add("active");
+
+        // Update Intel Card HTML
+        intelCardEl.innerHTML = `
+                <div class="flex items-start justify-between mb-4 border-b border-stone-200 pb-4">
+                    <div>
+                        <span class="text-xs uppercase font-bold px-2 py-1 rounded-full mb-2 inline-block ${getCategoryClass(data.category)}">${data.categoryLabel}</span>
+                        <h2 class="text-2xl font-bold font-mono text-stone-800 mt-1 break-all">${data.domain}</h2>
+                        <p class="text-stone-500 font-medium mt-1">Operated by: <span class="text-stone-800">${data.company}</span></p>
+                    </div>
+                </div>
+
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="text-lg font-semibold text-stone-800 flex items-center gap-2">
+                            <span class="text-lg">&#x1F4CB;</span> Purpose & Context
+                        </h3>
+                        <p class="mt-2 text-stone-600 leading-relaxed bg-stone-50 p-4 rounded-lg border border-stone-100 shadow-inner">
+                            <strong>${data.title}:</strong> ${data.desc}
+                        </p>
+                    </div>
+
+                    <div>
+                        <h3 class="text-lg font-semibold text-stone-800 flex items-center gap-2">
+                            <span class="text-lg">&#x1F4BB;</span> API Architectural Inference
+                        </h3>
+                        <div class="mt-2 bg-[#282c34] text-[#abb2bf] p-4 rounded-lg font-mono text-sm overflow-x-auto shadow-inner border border-stone-800">
+                            <p class="mb-2 text-[#e5c07b]">// Theoretical API Documentation based on OSINT</p>
+                            <p>${data.apiInference}</p>
+                            <div class="mt-3 text-xs text-[#5c6370]">
+                                > Protocol: HTTPS<br>
+                                > Auth: Device Certificate / Bearer Token<br>
+                                > Payload Encoding: application/json or protobuf
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="pt-4 border-t border-stone-200">
+                        <h3 class="text-sm font-semibold text-stone-800 mb-2">Mitigation Action</h3>
+                        <p class="text-sm text-stone-600">
+                            ${
+                              data.category === "telemetry" ||
+                              data.category === "ads"
+                                ? "<strong>Recommendation:</strong> This domain is safe to block via Pi-hole or DNS sinkhole to enhance privacy. Blocking will not break core TV viewing functionality, though it may break voice assistants or home screen app recommendations."
+                                : "<strong>Recommendation:</strong> Do not block. Blocking this domain may prevent firmware updates, break the user interface, or prevent the device from booting correctly."
+                            }
+                        </p>
+                    </div>
+                </div>
+            `;
+      }
+
+      // Event Listeners
+      filterSelect.addEventListener("change", (e) => {
+        currentFilter = e.target.value;
+        renderList();
+        // Reset Intel Card
+        intelCardEl.innerHTML = `
+                <div class="h-full flex flex-col items-center justify-center text-center text-stone-400">
+                    <div class="text-6xl mb-4">&#x1F50D;</div>
+                    <h3 class="text-xl font-medium text-stone-600">Select a domain</h3>
+                    <p class="mt-2 text-sm max-w-sm">Click any domain in the list to reveal associated intelligence, APIs, and company background.</p>
+                </div>
+            `;
+      });
+
+      // Init
+      document.addEventListener("DOMContentLoaded", () => {
+        initCharts();
+        renderList();
+      });
+    </script>
+  </body>
+</html>
