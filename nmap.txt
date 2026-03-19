@@ -1,0 +1,28 @@
+Nmap scan report for 192.168.178.35
+Host is up (0.0048s latency).
+Not shown: 994 closed tcp ports (reset)
+PORT      STATE SERVICE         VERSION
+5555/tcp  open  adb             Android Debug Bridge (token auth required)
+8008/tcp  open  http?
+|_http-title: Site doesn't have a title (text/html).
+8009/tcp  open  ssl/ajp13?
+| ssl-cert: Subject: commonName=2d4a0424-3893-2f48-f3a7-c05561c6e028
+| Not valid before: 2026-03-15T09:38:02
+|_Not valid after:  2026-03-17T09:38:02
+|_ajp-methods: Failed to get a valid response for the OPTION request
+|_ssl-date: TLS randomness does not represent time
+8443/tcp  open  ssl/https-alt?
+|_http-title: Site doesn't have a title (text/html).
+| ssl-cert: Subject: commonName=-3164430228782313381/organizationName=Google Inc/stateOrProvinceName=Washington/countryName=US
+| Not valid before: 2026-03-10T13:13:43
+|_Not valid after:  2046-03-11T13:13:43
+|_ssl-date: 2026-03-16T16:22:47+00:00; -1m44s from scanner time.
+9000/tcp  open  ssl/cslistener?
+10003/tcp open  documentum_s?
+MAC Address: D0:65:B3:E8:6D:15 (Unknown)
+Device type: general purpose
+Running: Linux 4.X|5.X
+OS CPE: cpe:/o:linux:linux_kernel:4 cpe:/o:linux:linux_kernel:5
+OS details: Linux 4.15 - 5.19
+Network Distance: 1 hop
+Service Info: OS: Android; CPE: cpe:/o:linux:linux_kernel
